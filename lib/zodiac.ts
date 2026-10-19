@@ -1,8 +1,29 @@
 import { OpenAI } from 'openai';
 
+// baseURL 可指向 justwoker 中转站 / 自建代理（中国网络环境下通过 OPENAI_BASE_URL 注入），
+// 未设置时回退到 OpenAI 官方地址。
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL,
 });
+
+// 本地模拟兜底：当中转站或官方接口不可达时，返回基于星座配置的确定性运势，
+// 保证中国网络环境下页面不白屏、Vercel 部署后也能正常渲染。
+function mockFortune(
+  config: { name: string; element: string; trait: string },
+  type: 'daily' | 'deep'
+): string {
+  if (type === 'daily') {
+    return `[${config.name}·本地模拟]\n综合评分 78\n金句：星辰不语，却早已写好答案。\n今日核心建议：保持自己的节奏，把重要的事放在精力最好的上午完成。`;
+  }
+  return (
+    `[${config.name}·本地模拟·深度解析]\n\n` +
+    `【事业财富】现状：星象平稳，宜守不宜攻。破局之策：聚焦一件能立刻产出结果的小事，积累确定性。\n\n` +
+    `【情感关系】现状：沟通宫位活跃，误会易消。破局之策：主动一次轻量表达，胜过十次内心戏。\n\n` +
+    `【身心健康】现状：精力曲线前高后低。破局之策：午后留 20 分钟空白，给神经系统缓冲。\n\n` +
+    `今日幸运色：霁蓝　幸运数字：7`
+  );
+}
 
 export const ZODIAC_CONFIG = {
   Aries: { name: '白羊座', element: '火', trait: '热情、勇敢、冲动' },
@@ -37,11 +58,18 @@ export async function getFortune(zodiacSign: string, type: 'daily' | 'deep' = 'd
        4. 结尾：给出一个专属的【今日幸运色】和【幸运数字】。
        5. 长度：500-800字。`;
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'system', content: 'You are a professional astrologer.' }, { role: 'user', content: prompt }],
-    temperature: 0.7,
-  });
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'system', content: 'You are a professional astrologer.' }, { role: 'user', content: prompt }],
+      temperature: 0.7,
+    });
 
-  return response.choices[0].message.content;
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error('empty completion');
+    return content;
+  } catch (err) {
+    console.error('[zodiac] OpenAI/中转站调用失败，启用本地模拟兜底:', err);
+    return mockFortune(config, type);
+  }
 }
