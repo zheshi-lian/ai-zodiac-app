@@ -1,0 +1,29 @@
+# ============================================================
+# 默认忽略当前目录下的【所有】内容，仅放行 AI Zodiac App 源码。
+# 原因：本工作目录 d:/训练数据 还混入了整个 AppLink 广告平台项目、
+# 密钥(.env)、token 日志、视频、tar.gz 等训练数据，绝不能推送到仓库。
+# ============================================================
+*
+
+# 放行 .gitignore 自身
+!.gitignore
+
+# ---- 仅放行 AI Zodiac App 的源码 ----
+!app/
+!app/**
+!lib/
+!lib/**
+
+!package.json
+!next.config.js
+!tsconfig.json
+!postcss.config.js
+!tailwind.config.js
+
+# ---- 标准 Next.js 忽略项（本地构建产物，避免误提交）----
+node_modules/
+.next/
+out/
+*.log
+.env
+.env.*
