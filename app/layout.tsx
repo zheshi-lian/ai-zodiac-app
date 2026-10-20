@@ -65,9 +65,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="muted"> · 内容由 AI 生成，仅供娱乐与自我觉察，不构成任何决策建议。</span>
             </div>
             <nav aria-label="相关链接">
+              <a href="https://dellai.xyz/free-tools.html">全部免费产品</a>
               <a href="https://dellai.xyz/home.html">AppLink 首页</a>
               <a href="https://dellai.xyz/tool/writing-assistant.html">AI 写作助手</a>
               <a href="https://dellai.xyz/tool/image-tool.html">AI 美图工具</a>
+              <a href="https://dellai.xyz/tool/homework.html">家庭作业本</a>
               <a href="https://dellai.xyz/privacy.html">隐私政策</a>
               <a href="https://dellai.xyz/terms.html">服务条款</a>
             </nav>
