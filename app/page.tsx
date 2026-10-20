@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowRightIcon, SparklesIcon, MoonStarsIcon, GiftIcon } from 'lucide-react';
+import { ArrowRightIcon, SparklesIcon, MoonStarIcon, GiftIcon } from 'lucide-react';
 import { ZODIAC_CONFIG } from '@/lib/zodiac-data';
 import { AdSDK } from '@/lib/adSdk';
 
 // Initialize AdSDK (in real operation, the baseUrl would be 'https://dellai.xyz')
 const adSdk = new AdSDK({
-  baseUrl: process.env.NEXT_PUBLIC_AD_PLATFORM_URL || 'https://dellai.xyz', 
+  baseUrl: process.env.NEXT_PUBLIC_AD_PLATFORM_URL || 'https://dellai.xyz',
   adUnitId: process.env.NEXT_PUBLIC_AU_REWARDED || 'au_test_rewarded_001',
 });
 
@@ -157,7 +157,7 @@ export default function Home() {
 
         {!fortune && zodiac && !loading && (
           <div className="text-center py-8">
-            <MoonStarsIcon className="mx-auto h-12 w-12 text-white/50 mb-4" />
+            <MoonStarIcon className="mx-auto h-12 w-12 text-white/50 mb-4" />
             <p className="text-gray-400">
               宇宙正在为您计算运势... 请选择星座并点击查询
             </p>
