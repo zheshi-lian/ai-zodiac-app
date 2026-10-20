@@ -1,6 +1,8 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { ArrowRightIcon, SparklesIcon, MoonStarsIcon, GiftIcon } from 'lucide-react';
-import { ZODIAC_CONFIG } from '@/lib/zodiac';
+import { ZODIAC_CONFIG } from '@/lib/zodiac-data';
 import { AdSDK } from '@/lib/adSdk';
 
 // Initialize AdSDK (in real operation, the baseUrl would be 'https://dellai.xyz')
