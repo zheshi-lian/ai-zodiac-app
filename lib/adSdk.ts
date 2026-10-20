@@ -92,7 +92,7 @@ class AdSDK {
 
     // Simulate sending to server
     if (bidResponse?.id) {
-      payload.bid_id = bidResponse.id;
+      (payload as any).bid_id = bidResponse.id;
     }
 
     fetch(this.baseUrl + '/api/public/impression', {
@@ -127,7 +127,7 @@ class AdSDK {
         'X-AdUnit': this.adUnitId,
       },
       body: JSON.stringify({
-        imp,
+        imp_id: impId,
         project: 'direct',
         ...metadata,
       }),
