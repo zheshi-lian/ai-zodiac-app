@@ -248,7 +248,7 @@ export default function FortuneApp({ initialSign }: { initialSign?: SignInfo }) 
             <p className="fortune">{result}</p>
             <div className="actions">
               <button className="ghost" onClick={share}>
-                {shared ? '已分享' : '分享给朋友'}
+                {shared ? '分享链接已就绪' : '分享给朋友'}
               </button>
               {!deep && (
                 <button className="ghost" onClick={unlockDeep} disabled={deepLoading}>
