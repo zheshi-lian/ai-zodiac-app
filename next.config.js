@@ -28,6 +28,16 @@ const nextConfig = {
       },
     ];
   },
+  // 平台首页把「AI 星座运势」指向 /tool/astrology.html。
+  // 该路径由 Cloudflare 分流到本 Vercel 项目，因此在这里把它重写到星座首页，
+  // 避免用户点进去看到 Vercel 的 404。
+  async rewrites() {
+    return [
+      { source: '/tool/astrology.html', destination: '/' },
+      { source: '/tool/astrology', destination: '/' },
+      { source: '/astrology.html', destination: '/' },
+    ];
+  },
 };
 
 module.exports = nextConfig;
