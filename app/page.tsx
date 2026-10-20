@@ -34,14 +34,18 @@ export default function Home() {
         setAdStatus('已连接 AppLink 广告引擎');
       }
 
-      const res = await fetch('/api/fortune', {
+      const signName = ZODIAC_CONFIG[zodiac as keyof typeof ZODIAC_CONFIG]?.name || zodiac;
+      const res = await fetch('/api/ai-tool', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zodiac, type: 'daily' }),
+        body: JSON.stringify({ tool: 'astrology', content: signName, sign: signName, type: 'daily' }),
       });
       const data = await res.json();
-      if (data.fortune) {
-        setFortune(data.fortune);
+      const text = data.result || data.fortune;
+      if (text) {
+        setFortune(text);
+      } else {
+        throw new Error(data.message || data.error || 'empty fortune');
       }
     } catch (err) {
       console.error('Failed to fetch fortune:', err);
@@ -62,14 +66,18 @@ export default function Home() {
   const generateDeepAnalysis = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/fortune', {
+      const signName = ZODIAC_CONFIG[zodiac as keyof typeof ZODIAC_CONFIG]?.name || zodiac;
+      const res = await fetch('/api/ai-tool', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zodiac, type: 'deep' }),
+        body: JSON.stringify({ tool: 'astrology', content: signName, sign: signName, type: 'monthly' }),
       });
       const data = await res.json();
-      if (data.fortune) {
-        setDeepFortune(data.fortune);
+      const text = data.result || data.fortune;
+      if (text) {
+        setDeepFortune(text);
+      } else {
+        throw new Error(data.message || data.error || 'empty deep fortune');
       }
     } catch (err) {
       console.error('Failed to fetch deep analysis:', err);
