@@ -1,5 +1,3 @@
-export type { default as AdSDK } from './adSdk';
-
 // Client-side ad tracking SDK
 class AdSDK {
   private baseUrl: string;
