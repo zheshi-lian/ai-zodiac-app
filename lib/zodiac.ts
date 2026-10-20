@@ -1,14 +1,19 @@
 import { OpenAI } from 'openai';
 
-// baseURL 可指向 justwoker 中转站 / 自建代理（中国网络环境下通过 OPENAI_BASE_URL 注入），
-// 未设置时回退到 OpenAI 官方地址。
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_BASE_URL,
-});
+// 中转站（relay）列表：中国网络环境下直连 OpenAI 不稳定，改为通过兼容 OpenAI 协议的中转站。
+// 可通过环境变量 ZODIAC_RELAYS 配置多个（逗号分隔），按顺序尝试；默认使用 agtcloud。
+const RELAYS: string[] = (process.env.ZODIAC_RELAYS || 'https://api.agtcloud.cn/v1')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
-// 本地模拟兜底：当中转站或官方接口不可达时，返回基于星座配置的确定性运势，
-// 保证中国网络环境下页面不白屏、Vercel 部署后也能正常渲染。
+// 中转站鉴权密钥；也可用通用的 OPENAI_API_KEY。
+const API_KEY = process.env.ZODIAC_API_KEY || process.env.OPENAI_API_KEY || '';
+
+// 中转站模型；默认使用 agtcloud 免费的 minimax 模型，可通过 ZODIAC_MODEL 覆盖。
+const MODEL = process.env.ZODIAC_MODEL || 'minimax-m3.1-flash:free';
+
+// 本地模拟兜底：所有中转站都不可达时，返回基于星座配置的确定性运势，保证页面不白屏。
 function mockFortune(
   config: { name: string; element: string; trait: string },
   type: 'daily' | 'deep'
@@ -44,6 +49,12 @@ export async function getFortune(zodiacSign: string, type: 'daily' | 'deep' = 'd
   const config = ZODIAC_CONFIG[zodiacSign as keyof typeof ZODIAC_CONFIG];
   if (!config) throw new Error('Invalid zodiac sign');
 
+  // 未配置密钥时直接走本地模拟，避免无意义的网络请求。
+  if (!API_KEY) {
+    console.warn('[zodiac] 未配置 ZODIAC_API_KEY / OPENAI_API_KEY，使用本地模拟兜底');
+    return mockFortune(config, type);
+  }
+
   const prompt = type === 'daily' 
     ? `你是一位精通现代占星学的顶尖大师。请为${config.name}（${config.element}象，特质：${config.trait}）提供今日简短运势。
        要求：
@@ -58,18 +69,25 @@ export async function getFortune(zodiacSign: string, type: 'daily' | 'deep' = 'd
        4. 结尾：给出一个专属的【今日幸运色】和【幸运数字】。
        5. 长度：500-800字。`;
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'system', content: 'You are a professional astrologer.' }, { role: 'user', content: prompt }],
-      temperature: 0.7,
-    });
+  let lastErr: unknown;
+  for (const baseURL of RELAYS) {
+    try {
+      const client = new OpenAI({ apiKey: API_KEY, baseURL });
+      const response = await client.chat.completions.create({
+        model: MODEL,
+        messages: [{ role: 'system', content: 'You are a professional astrologer.' }, { role: 'user', content: prompt }],
+        temperature: 0.7,
+      });
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) throw new Error('empty completion');
-    return content;
-  } catch (err) {
-    console.error('[zodiac] OpenAI/中转站调用失败，启用本地模拟兜底:', err);
-    return mockFortune(config, type);
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error('empty completion');
+      return content;
+    } catch (err) {
+      lastErr = err;
+      console.error(`[zodiac] 中转站 ${baseURL} 调用失败:`, err);
+    }
   }
+
+  console.error('[zodiac] 所有中转站均不可用，启用本地模拟兜底:', lastErr);
+  return mockFortune(config, type);
 }
