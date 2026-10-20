@@ -129,24 +129,34 @@ export default function FortuneApp({ initialSign }: { initialSign?: SignInfo }) 
     const canClipboard = typeof navigator !== 'undefined' && !!navigator.clipboard;
     track('share_click', { sign: sign.slug, period });
     try {
+      let method: 'native' | 'copy' | 'manual' = 'manual';
       if (canNative) {
-        await navigator.share({ title, text, url });
-        setShareMsg('已分享，深度解析已解锁');
+        try {
+          await navigator.share({ title, text, url });
+          method = 'native';
+        } catch {
+          method = 'manual';
+        }
       } else if (canClipboard) {
-        await navigator.clipboard.writeText(`${title}\n${url}`);
-        setShareMsg('链接已复制，深度解析已解锁');
-      } else {
-        setShareMsg(`手动复制链接分享：${url}`);
+        try {
+          await navigator.clipboard.writeText(`${title}\n${url}`);
+          method = 'copy';
+        } catch {
+          method = 'manual';
+        }
       }
       setShared(true);
-      track('share_success', {
-        sign: sign.slug,
-        period,
-        method: canNative ? 'native' : canClipboard ? 'copy' : 'manual',
-      });
+      setShareMsg(
+        method === 'native'
+          ? '已分享，深度解析已解锁'
+          : method === 'copy'
+            ? '链接已复制，深度解析已解锁'
+            : `手动复制链接分享：${url}`,
+      );
+      track('share_success', { sign: sign.slug, period, method });
       unlockDeep();
     } catch {
-      setShareMsg('已取消分享。也可以手动复制地址栏链接。');
+      setShareMsg('分享失败，请手动复制地址栏链接。');
     }
   }, [period, result, sign.slug, unlockDeep]);
 
