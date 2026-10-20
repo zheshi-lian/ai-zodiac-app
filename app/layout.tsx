@@ -23,11 +23,13 @@ export const metadata: Metadata = {
     siteName: 'AI 星座运势',
     title: 'AI 星座运势 · 今日运势与深度解析',
     description: '12 星座每日 / 每周 / 每月运势，AI 生成，免费使用。',
+    images: [{ url: '/astro/og.png', width: 1200, height: 630, alt: 'AI 星座运势' }],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'AI 星座运势 · 今日运势与深度解析',
     description: '12 星座每日 / 每周 / 每月运势，AI 生成，免费使用。',
+    images: ['/astro/og.png'],
   },
   icons: { icon: '/icon.svg', apple: '/icon.svg' },
 };
