@@ -5,15 +5,17 @@ import { useEffect, useRef, useState } from 'react';
 /**
  * AI 星盘相位 · 深度运势（漏斗 A · 心理版）
  * 生成概览（免费）→ 激励视频解锁 → 心理相位破局报告。
- * 广告走 AppLink 发布方 SDK（pub_sdk.js）：激励位=星盘相位-激励位，原生位=星盘相位-原生位；
- * 发奖由同源中继 /api/astro/reward 用服务端 api_key 签名（浏览器不持密钥）。
+ * 广告走 AppLink 发布方 SDK（pub_sdk.js），埋点全部由平台数据引擎驱动：
+ * 页面只报 placement 名（astro_deep_unlock / astro_native），单元由 /api/publisher/boot 下发，
+ * 页面零硬编码单元 ID；发奖由同源中继 /api/astro/reward 用服务端 api_key 签名（浏览器不持密钥）。
  */
 const SIGNS = [
   '白羊座', '金牛座', '双子座', '巨蟹座', '狮子座', '处女座',
   '天秤座', '天蝎座', '射手座', '摩羯座', '水瓶座', '双鱼座',
 ];
-const REWARD_UNIT_FALLBACK = 'au_mvmrfblj8q8s2z';   // 星盘相位-激励位（boot 失败时兜底）
-const NATIVE_UNIT = 'au_mvmrfboj8pmbz0';             // 星盘相位-原生位
+
+type PlacementInfo = { ad_unit_id: string; format: string; name: string };
+type Placements = Record<string, PlacementInfo>;
 
 function track(event: string, props: Record<string, unknown> = {}) {
   try {
@@ -31,21 +33,30 @@ export default function FortuneApp() {
   const [unlocked, setUnlocked] = useState(false);
   const [err, setErr] = useState('');
   const [deepBusy, setDeepBusy] = useState(false);
-  const [rewardUnit, setRewardUnit] = useState(REWARD_UNIT_FALLBACK);
+  const placementsRef = useRef<Placements>({});
+  const nativeSlotRef = useRef<HTMLDivElement>(null);
   const outRef = useRef<HTMLDivElement>(null);
 
-  // 平台 SDK：加载 → boot 拉本产品单元 → configure（publishable_key 启用行为事件流；发奖走服务端中继）
+  // 平台 SDK：boot 按 placement 拉本产品单元（引擎驱动）→ configure（publishable_key 启用行为事件流；
+  // 发奖走服务端中继）→ 原生位容器建位
   useEffect(() => {
-    fetch('/api/publisher/boot?domain=' + encodeURIComponent(location.hostname) + '&unit_name=' + encodeURIComponent('星盘相位'))
+    fetch('/api/publisher/boot?domain=' + encodeURIComponent(location.hostname) + '&placements=astro_deep_unlock,astro_native')
       .then((r) => r.json())
       .then((d) => {
         if (!d || !d.ok) return;
-        if (d.by_format?.rewarded?.ad_unit_id) setRewardUnit(d.by_format.rewarded.ad_unit_id);
+        placementsRef.current = d.placements || {};
         const t = setInterval(() => {
-          const p = (window as unknown as { 平台?: { configure?: (o: Record<string, string>) => void } }).平台;
-          if (p && p.configure) {
+          const p = (window as unknown as { 平台?: { configure?: (o: Record<string, string>) => void; defineSlot?: (el: HTMLElement, spec: Record<string, unknown>) => { id: string } | null; refresh?: (ids?: string[]) => void } }).平台;
+          if (p && p.configure && p.defineSlot) {
             clearInterval(t);
             p.configure({ apiKey: d.publishable_key || '', rewardUrl: '/api/astro/reward' });
+            const el = nativeSlotRef.current;
+            const np = placementsRef.current.astro_native;
+            if (el && np && np.ad_unit_id && !el.getAttribute('data-defined')) {
+              el.setAttribute('data-defined', '1');
+              p.defineSlot(el, { format: 'native', adUnit: np.ad_unit_id, cat: 'astrology', geo: 'CN', floor: 0 });
+              p.refresh && p.refresh();
+            }
           }
         }, 300);
         setTimeout(() => clearInterval(t), 10000);
@@ -122,7 +133,13 @@ export default function FortuneApp() {
 
   function onUnlock() {
     const ad = sdk();
-    if (!ad) { unlockedViaRef.current = 'fallback'; track('astro_ad_fallback', { reason: 'sdk_missing' }); expandDeep(); return; }
+    const rewardUnit = placementsRef.current.astro_deep_unlock?.ad_unit_id;
+    if (!ad || !rewardUnit) {
+      unlockedViaRef.current = 'fallback';
+      track('astro_ad_fallback', { reason: ad ? 'placement_missing' : 'sdk_missing' });
+      expandDeep();
+      return;
+    }
     setDeepBusy(true);
     track('unlock_click', { sign, period, method: 'rewarded' });
     ad.showRewarded({ adUnit: rewardUnit, placement: 'astro_deep_unlock' })
@@ -248,16 +265,9 @@ export default function FortuneApp() {
         </p>
       </section>
 
-      {/* AppLink 原生位（第二形态）：曝光/点击归因到 星盘相位-原生位 */}
+      {/* AppLink 原生位（第二形态）：引擎驱动——容器只报 placement，单元由 boot 下发后 defineSlot */}
       <aside className="panel" aria-label="广告" style={{ minHeight: 100 }}>
-        <div
-          className="ad-slot"
-          data-ad-unit={NATIVE_UNIT}
-          data-format="native"
-          data-cat="astrology"
-          data-geo="CN"
-          data-floor="0"
-        />
+        <div ref={nativeSlotRef} data-placement="astro_native" style={{ minHeight: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
         <p className="muted" style={{ fontSize: 11, marginTop: 4, textAlign: 'center' }}>广告 · 由 AppLink 提供</p>
       </aside>
     </div>
