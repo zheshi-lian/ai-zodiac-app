@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
+import ConsentBanner from './components/ConsentBanner';
+import PostHogReplay from './components/PostHogReplay';
 import './globals.css';
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://dellai.xyz';
@@ -83,9 +85,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* AppLink 发布方 SDK：自动填充页面上的 .ad-slot（声明式广告位，见 components/FortuneApp.tsx），
             并提供 平台.showRewarded（激励视频解锁）。绝对地址：本应用部署在 dellai.xyz 路径下，
             广告请求/曝光/发奖全部回连源站 dellai.xyz/ssp/* 与 /api/astro/reward。 */}
-        <Script src="https://dellai.xyz/pub_sdk.js?v=2.1.2" strategy="afterInteractive" />
-        {/* 第一方产品事件（page_view / generate_* / unlock_*），同源回连 /api/track/event */}
-        <Script src="https://dellai.xyz/track.js" data-app="astrology" strategy="afterInteractive" />
+        <Script src="https://dellai.xyz/pub_sdk.js?v=2.2.0" strategy="afterInteractive" />
+        {/* 平台化产品埋点（2026-10-27）：alTrack → /api/apps/telemetry/events（publishable_key 鉴权，
+            开发者后台 /pub-apps.html 漏斗×收入报表）；转化归因 /api/track/conversion 不变 */}
+        <Script src="https://dellai.xyz/track.js?v=plat1" data-app="astrology" strategy="afterInteractive" />
+        {/* PostHog 会话回放：同意前不 init、不录制；隐私选项与 URL 脱敏见 lib/posthog-replay.mjs */}
+        <PostHogReplay />
+        <ConsentBanner />
       </body>
     </html>
   );

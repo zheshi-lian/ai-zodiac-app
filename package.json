@@ -8,27 +8,28 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint app lib --ext .js,.cjs,.mjs,.jsx,.ts,.tsx"
   },
   "dependencies": {
-    "next": "14.2.4",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "openai": "^4.47.0",
-    "zod": "^3.23.8",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
-    "lucide-react": "^0.378.0"
+    "lucide-react": "^0.378.0",
+    "next": "14.2.4",
+    "openai": "^4.47.0",
+    "posthog-js": "1.438.13",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
     "@types/node": "^20.14.2",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.4",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.2.4"
+    "typescript": "^5.4.5"
   }
 }

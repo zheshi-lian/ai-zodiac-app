@@ -20,6 +20,10 @@
 !postcss.config.js
 !tailwind.config.js
 
+# ---- PostHog 会话回放交付物（不含量级密钥，可审阅）----
+!POSTHOG_REPLAY.md
+!posthog-replay.check.mjs
+
 # ---- 标准 Next.js 忽略项（本地构建产物，避免误提交）----
 node_modules/
 .next/
@@ -27,3 +31,6 @@ out/
 *.log
 .env
 .env.*
+
+# 示例变量文件（值为空）需要可审阅，单独放行
+!.env.example
