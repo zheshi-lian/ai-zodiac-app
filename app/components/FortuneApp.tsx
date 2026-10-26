@@ -43,7 +43,10 @@ export default function FortuneApp() {
   // ── 破局行动卡：从议题行动池按「日期×星座×议题」确定性抽 3 条（可玩性 + 明日回访钩子）──
   // 勾满 3 件 → 庆祝态 + 带任务深度信号（ai_signals）刷新原生位，让平台在"完成度最高"
   // 的时刻出价值最高的广告 —— 这是 AppLink 交互特征钩子的直接用法。
-  const TOPICS = ['综合', '人际社交', '决策纠结', '情绪能量', '自我成长'] as const;
+  const TOPICS = [
+    { k: '综合', e: '✦' }, { k: '人际社交', e: '💬' }, { k: '决策纠结', e: '⚖️' },
+    { k: '情绪能量', e: '🌊' }, { k: '自我成长', e: '🌱' },
+  ] as const;
   const ACTION_POOL: Record<string, string[]> = {
     '综合': ['把最拖的一件事做完 10%', '给想感谢的人发条消息', '睡前写三行今天的高光', '散步 20 分钟不想工作', '整理一张桌面/一个相册', '只喝白开水过完下午'],
     '人际社交': ['主动约一个很久没见的人', '当面（而非微信）夸一个人', '拒绝一个不想去的局', '认真听完一段抱怨不给建议', '给家人打个电话', '在群里认真回一条消息'],
@@ -253,7 +256,8 @@ export default function FortuneApp() {
         .xp-err{margin-top:14px;border:1px solid #7f2b2b;background:rgba(248,113,113,.08);color:#fca5a5;border-radius:9px;padding:11px 13px;font-size:13px}
         .xp-out{border:1px solid #26355c;border-radius:12px;padding:18px;background:#0d1730;margin-top:18px;white-space:pre-wrap;line-height:1.9;font-size:14.5px;color:#dbe6ff;text-align:left}
         .xp-topics{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-        .xp-t{padding:7px 15px;border-radius:999px;border:1px solid #2f4170;background:#0d1730;color:#93a3c4;font-size:13px;cursor:pointer;transition:.15s}
+        .xp-t{padding:9px 16px;border-radius:14px;border:1px solid #2f4170;background:#0d1730;color:#93a3c4;font-size:13.5px;cursor:pointer;transition:.15s}
+        .xp-t.on{transform:translateY(-1px)}
         .xp-t:hover{border-color:#60a5fa;color:#bfdbfe}
         .xp-t.on{border-color:#22d3ee;background:rgba(34,211,238,.12);color:#a5f3fc;font-weight:600}
         .xp-acts{margin-top:16px;border:1px dashed #33507f;border-radius:12px;padding:14px;background:rgba(34,211,238,.04)}
@@ -274,9 +278,9 @@ export default function FortuneApp() {
       `}</style>
 
       <section className="hero xp-hero">
-        <div className="eyebrow">AI 占星 · 免费 · 无需注册</div>
+        <div className="eyebrow">AI 占星 · 心理版 · 免费</div>
         <h1>AI 星盘相位 · 深度运势</h1>
-        <p className="sub">解析行星相位，挖掘潜意识规律，提供可执行的破局之策。免费看今日简报 / 本周趋势，看视频解锁心理相位破局报告。</p>
+        <p className="sub">选一个议题，30 秒拿到今天的相位速览。</p>
       </section>
 
       <section className="panel" aria-label="选择星座与周期">
@@ -303,8 +307,8 @@ export default function FortuneApp() {
         </div>
         <div className="xp-topics" aria-label="今日议题">
           {TOPICS.map((t) => (
-            <button key={t} type="button" className={'xp-t' + (topic === t ? ' on' : '')}
-              onClick={() => setTopic(t)}>{t}</button>
+            <button key={t.k} type="button" className={'xp-t' + (topic === t.k ? ' on' : '')}
+              onClick={() => setTopic(t.k)}>{t.e} {t.k}</button>
           ))}
         </div>
         <div className="xp-zodiac" role="listbox" aria-label="十二星座">
@@ -346,7 +350,7 @@ export default function FortuneApp() {
                 <p className="xp-acts-tip">
                   {actions.every((a) => a.done)
                     ? '🎉 三件全做完——今天的你已经赢过昨天的自己。明天来看新的行动卡。'
-                    : '全部勾完，会为你点亮今日成就（广告也会换得更懂你）。'}
+                    : '全部勾完，点亮今日成就。'}
                 </p>
               </div>
             )}
@@ -359,8 +363,7 @@ export default function FortuneApp() {
         )}
         {!result && !loading && !err && (
           <section className="panel empty">
-            <p>选择星座后点「生成」，就会得到一段完整的相位解读。</p>
-            <p className="muted">看完视频可解锁深度破局报告；广告暂时没有库存时会直接免费展开。</p>
+            <p>选议题 → 生成 → 翻牌三件今天能做的事。</p>
           </section>
         )}
       </div>
