@@ -519,6 +519,27 @@ export default function FortuneApp() {
         </p>
       </section>
 
+      {/* 有机交叉导流（2026-10-28）：流量王的站内接力位，付费侧由交叉导流计划覆盖 */}
+      <section className="panel" aria-label="接下来玩什么">
+        <h2 className="section-title">接下来玩什么？</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <a href="https://dellai.xyz/tool/tarot.html" style={{ textDecoration: 'none' }}>
+            <div style={{ border: '1px solid #26355c', borderRadius: 12, padding: '14px 12px', background: '#0d1730', transition: '.15s' }}>
+              <div style={{ fontSize: 24 }}>🔮</div>
+              <div style={{ fontWeight: 700, color: '#dbe6ff', fontSize: 14, marginTop: 6 }}>AI 塔罗</div>
+              <div style={{ color: '#93a3c4', fontSize: 12, marginTop: 3 }}>抽今天的牌，翻面即解读</div>
+            </div>
+          </a>
+          <a href="https://dellai.xyz/tool/writing-assistant.html" style={{ textDecoration: 'none' }}>
+            <div style={{ border: '1px solid #26355c', borderRadius: 12, padding: '14px 12px', background: '#0d1730', transition: '.15s' }}>
+              <div style={{ fontSize: 24 }}>✍️</div>
+              <div style={{ fontWeight: 700, color: '#dbe6ff', fontSize: 14, marginTop: 6 }}>AI 写作助手</div>
+              <div style={{ color: '#93a3c4', fontSize: 12, marginTop: 3 }}>给需求，直接拿成稿</div>
+            </div>
+          </a>
+        </div>
+      </section>
+
       {/* AppLink 原生位（第二形态）：引擎驱动——容器只报 placement，单元由 boot 下发后 defineSlot */}
       <aside className="panel" aria-label="广告" style={{ minHeight: 100 }}>
         <div ref={nativeSlotRef} data-placement="astro_native" style={{ minHeight: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
