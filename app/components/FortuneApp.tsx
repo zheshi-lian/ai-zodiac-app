@@ -3,19 +3,24 @@
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * AI 星盘相位 · 深度运势（漏斗 A · 心理版）
- * 生成概览（免费）→ 激励视频解锁 → 心理相位破局报告。
+ * AI 星盘相位 · 深度运势（漏斗 A · 心理版 · v2 三幕体验）
+ * 第一幕「问」：星座宫格 + 议题 chips，两次点击出结果；
+ * 第二幕「签」：结构化结果头（日期/打卡）+ 破局报告 teaser 解锁；
+ * 第三幕「行」：3D 翻牌行动卡 → 全勾点亮 → canvas 星签分享卡。
  * 广告走 AppLink 发布方 SDK（pub_sdk.js），埋点全部由平台数据引擎驱动：
  * 页面只报 placement 名（astro_deep_unlock / astro_native），单元由 /api/publisher/boot 下发，
  * 页面零硬编码单元 ID；发奖由同源中继 /api/astro/reward 用服务端 api_key 签名（浏览器不持密钥）。
  */
 const SIGNS = [
-  '白羊座', '金牛座', '双子座', '巨蟹座', '狮子座', '处女座',
-  '天秤座', '天蝎座', '射手座', '摩羯座', '水瓶座', '双鱼座',
+  { n: '白羊座', g: '♈' }, { n: '金牛座', g: '♉' }, { n: '双子座', g: '♊' },
+  { n: '巨蟹座', g: '♋' }, { n: '狮子座', g: '♌' }, { n: '处女座', g: '♍' },
+  { n: '天秤座', g: '♎' }, { n: '天蝎座', g: '♏' }, { n: '射手座', g: '♐' },
+  { n: '摩羯座', g: '♑' }, { n: '水瓶座', g: '♒' }, { n: '双鱼座', g: '♓' },
 ];
 
 type PlacementInfo = { ad_unit_id: string; format: string; name: string };
 type Placements = Record<string, PlacementInfo>;
+type ActionCard = { text: string; done: boolean; flipped: boolean };
 
 function track(event: string, props: Record<string, unknown> = {}) {
   try {
@@ -34,11 +39,13 @@ export default function FortuneApp() {
   const [err, setErr] = useState('');
   const [deepBusy, setDeepBusy] = useState(false);
   const [topic, setTopic] = useState('综合');
-  const [actions, setActions] = useState<Array<{ text: string; done: boolean }>>([]);
+  const [streak, setStreak] = useState(0);
+  const [actions, setActions] = useState<ActionCard[]>([]);
   const actionsCelebrated = useRef(false);
   const placementsRef = useRef<Placements>({});
   const nativeSlotRef = useRef<HTMLDivElement>(null);
   const outRef = useRef<HTMLDivElement>(null);
+  const unlockedViaRef = useRef<'rewarded' | 'fallback'>('rewarded');
 
   // ── 破局行动卡：从议题行动池按「日期×星座×议题」确定性抽 3 条（可玩性 + 明日回访钩子）──
   // 勾满 3 件 → 庆祝态 + 带任务深度信号（ai_signals）刷新原生位，让平台在"完成度最高"
@@ -54,7 +61,18 @@ export default function FortuneApp() {
     '情绪能量': ['睡前一小时不碰手机', '把情绪写成 3 句话不给它讲道理', '晒 15 分钟太阳', '做 20 个深蹲再决定要不要生气', '听一首初中听的歌', '早睡一次，明天再评'],
     '自我成长': ['学一个能立刻用上的小技巧', '读完收藏夹里最旧的一篇', '公开输出一段 200 字的思考', '向高手提一个具体问题', '把一个坏习惯延迟 10 分钟', '给自己定一个 7 天小赌约'],
   };
-  function todayKey() { return new Date().toISOString().slice(0, 10); }
+  const signGlyph = (SIGNS.find((s) => s.n === sign) || SIGNS[6]).g;
+
+  // 本地时区的「今天」：星签的日界跟着用户走，而不是 UTC
+  function todayKey(offsetDays = 0) {
+    const d = new Date(Date.now() + offsetDays * 86400000);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function dateLabel() {
+    const d = new Date();
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+
   function buildActions() {
     const pool = ACTION_POOL[topic] || ACTION_POOL['综合'];
     const s = todayKey() + '|' + sign + '|' + topic;
@@ -69,22 +87,34 @@ export default function FortuneApp() {
       if (!used.has(idx)) { used.add(idx); picked.push(pool[idx]); }
     }
     const key = 'xp_actions_' + todayKey();
-    let saved: Array<{ text: string; done: boolean }> = [];
+    let saved: Array<{ text: string; done?: boolean; flipped?: boolean }> = [];
     try { saved = JSON.parse(localStorage.getItem(key) || '[]'); } catch { /* ignore */ }
-    setActions(picked.map((text) => ({ text, done: saved.some((x) => x.text === text && x.done) })));
+    setActions(picked.map((text) => {
+      const old = saved.find((x) => x.text === text);
+      // 历史已勾选的卡自动呈翻开态，回来不重演仪式
+      return { text, done: !!old?.done, flipped: !!(old && (old.flipped || old.done)) };
+    }));
   }
-  function toggleAction(i: number) {
-    setActions((prev) => {
-      const next = prev.map((a, j) => (j === i ? { ...a, done: !a.done } : a));
-      try { localStorage.setItem('xp_actions_' + todayKey(), JSON.stringify(next)); } catch { /* ignore */ }
-      const all = next.every((a) => a.done);
-      if (all && !actionsCelebrated.current) {
-        actionsCelebrated.current = true;
-        track('actions_done', { sign, topic, count: 3 });
-        celebrateAndBoostAds();
-      }
-      return next;
-    });
+  function persistActions(next: ActionCard[]) {
+    try { localStorage.setItem('xp_actions_' + todayKey(), JSON.stringify(next)); } catch { /* ignore */ }
+  }
+  function flipCard(i: number) {
+    const card = actions[i];
+    if (!card) return;
+    if (!card.flipped) {
+      const next = actions.map((a, j) => (j === i ? { ...a, flipped: true } : a));
+      setActions(next); persistActions(next);
+      track('card_flip', { sign, topic, index: i });
+      return;
+    }
+    const next = actions.map((a, j) => (j === i ? { ...a, done: !a.done } : a));
+    setActions(next); persistActions(next);
+    const all = next.every((a) => a.done);
+    if (all && !actionsCelebrated.current) {
+      actionsCelebrated.current = true;
+      track('actions_done', { sign, topic, count: 3 });
+      celebrateAndBoostAds();
+    }
   }
   function celebrateAndBoostAds() {
     // 平台钩子：任务完成深度 → 原生位带 ai_signals 重新出价（此刻用户价值最高）
@@ -99,6 +129,84 @@ export default function FortuneApp() {
         w.平台.refresh && w.平台.refresh();
       }
     } catch { /* 钩子失败不影响主流程 */ }
+  }
+
+  // ── 连续打卡：按本地日界累计「生成星签」的连续天数，回访理由的量化基建 ──
+  function bumpStreak(): number {
+    try {
+      const today = todayKey();
+      const raw = localStorage.getItem('xp_streak_v1');
+      const s = raw ? JSON.parse(raw) : { last: '', count: 0 };
+      if (s.last === today) return s.count || 1;
+      const count = s.last === todayKey(-1) ? (s.count || 0) + 1 : 1;
+      localStorage.setItem('xp_streak_v1', JSON.stringify({ last: today, count }));
+      return count;
+    } catch { return 1; }
+  }
+
+  // ── 星签分享卡：canvas 现画现分享（Web Share 优先，否则下载 PNG）──
+  function shareCard() {
+    track('share_card', { sign, topic });
+    try {
+      const S = 2, W = 600, H = 840;
+      const c = document.createElement('canvas');
+      c.width = W * S; c.height = H * S;
+      const x = c.getContext('2d');
+      if (!x) return;
+      x.scale(S, S);
+      const bg = x.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#0f0c29'); bg.addColorStop(0.55, '#1b1740'); bg.addColorStop(1, '#0d1730');
+      x.fillStyle = bg; x.fillRect(0, 0, W, H);
+      // 确定性星点：同一张星签每天长得一样
+      let h = 0; const seed = todayKey() + sign;
+      for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+      const rnd = () => { h = (h * 1103515245 + 12345) >>> 0; return (h >>> 8) / 16777216; };
+      x.fillStyle = 'rgba(255,255,255,.5)';
+      for (let i = 0; i < 46; i++) {
+        const r = rnd() * 1.6 + 0.4;
+        x.globalAlpha = rnd() * 0.5 + 0.15;
+        x.beginPath(); x.arc(rnd() * W, rnd() * H, r, 0, Math.PI * 2); x.fill();
+      }
+      x.globalAlpha = 1;
+      x.textAlign = 'center'; x.fillStyle = '#f3d98b';
+      x.font = '110px serif'; x.fillText(signGlyph, W / 2, 200);
+      x.fillStyle = '#fff'; x.font = 'bold 40px "PingFang SC","Microsoft YaHei",sans-serif';
+      x.fillText(sign + ' · 今日星签', W / 2, 278);
+      x.fillStyle = '#a9a3c9'; x.font = '22px "PingFang SC","Microsoft YaHei",sans-serif';
+      x.fillText(dateLabel() + ' · ' + topic + (nick.trim() ? ' · ' + nick.trim() : ''), W / 2, 318);
+      // 三件行动
+      x.textAlign = 'left';
+      let y = 420;
+      actions.forEach((a, i) => {
+        x.strokeStyle = a.done ? '#4ade80' : '#3b5a8f'; x.lineWidth = 2;
+        x.beginPath(); x.roundRect(70, y - 26, 30, 30, 7); x.stroke();
+        if (a.done) { x.fillStyle = '#4ade80'; x.font = 'bold 24px sans-serif'; x.fillText('✓', 77, y - 3); }
+        x.fillStyle = a.done ? '#9fb4dd' : '#e8eefc';
+        x.font = '24px "PingFang SC","Microsoft YaHei",sans-serif';
+        x.fillText((i + 1) + '. ' + a.text, 116, y - 3);
+        y += 76;
+      });
+      x.textAlign = 'center'; x.fillStyle = '#7dd3fc'; x.font = '20px "PingFang SC","Microsoft YaHei",sans-serif';
+      x.fillText('AI 星盘相位 · dellai.xyz', W / 2, H - 60);
+      const finish = (blob: Blob | null) => {
+        const file = blob ? new File([blob], 'star-card.png', { type: 'image/png' }) : null;
+        const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean; share?: (d: { files?: File[] }) => Promise<void> };
+        if (file && nav.canShare?.({ files: [file] }) && nav.share) {
+          // 平台口径：share_card=点击（漏斗 share_click），share_success=真实分享完成（漏斗 share_ok）
+          nav.share({ files: [file], title: sign + ' · 今日星签' })
+            .then(() => track('share_success', { sign, topic, via: 'webshare' }))
+            .catch(() => {});
+        } else {
+          const a = document.createElement('a');
+          a.href = blob ? URL.createObjectURL(blob) : c.toDataURL('image/png');
+          a.download = '星签-' + todayKey() + '.png';
+          a.click();
+          track('share_success', { sign, topic, via: 'download' });
+        }
+      };
+      if (c.toBlob) c.toBlob((b) => finish(b), 'image/png');
+      else finish(null);
+    } catch { /* 分享失败不影响主流程 */ }
   }
 
   // 平台 SDK：boot 按 placement 拉本产品单元（引擎驱动）→ configure（publishable_key 启用行为事件流；
@@ -142,7 +250,7 @@ export default function FortuneApp() {
       const [m1, d1, m2, d2] = edges[i];
       const after = m > m1 || (m === m1 && day >= d1);
       const before = m < m2 || (m === m2 && day <= d2);
-      if (after && before) { setSign(SIGNS[Math.min(i, 11)]); break; }
+      if (after && before) { setSign(SIGNS[Math.min(i, 11)].n); break; }
     }
   }, []);
 
@@ -172,6 +280,9 @@ export default function FortuneApp() {
     try {
       const text = await callAi('overview');
       setResult(text);
+      const n = bumpStreak();
+      setStreak(n);
+      if (n >= 2) track('streak_day', { sign, count: n });
       actionsCelebrated.current = false;
       buildActions();
       track('generate_success', { sign, period, ms: Date.now() - t0 });
@@ -195,8 +306,6 @@ export default function FortuneApp() {
       .catch((e) => setErr('深度解析生成失败：' + (e instanceof Error ? e.message : '请重试')))
       .finally(() => setDeepBusy(false));
   }
-
-  const unlockedViaRef = useRef<'rewarded' | 'fallback'>('rewarded');
 
   function onUnlock() {
     const ad = sdk();
@@ -235,75 +344,82 @@ export default function FortuneApp() {
       });
   }
 
+  const allDone = actions.length > 0 && actions.every((a) => a.done);
+
   return (
     <div className="app">
       <style>{`
         .xp-hero h1{margin:0 0 6px;font-size:30px;background:linear-gradient(to right,#fff,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
         .xp-sub{color:var(--mut,#93a3c4);margin:0 0 22px;font-size:14px}
-        .xp-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px}
-        @media(max-width:620px){.xp-grid{grid-template-columns:1fr}}
-        .xp-grid label{display:block;font-size:12px;color:var(--mut,#93a3c4);margin:10px 0 5px;text-align:left}
-        .xp-grid input,.xp-grid select{width:100%;padding:11px;border:1px solid #2f4170;background:#0d1730;color:#e8eefc;border-radius:8px;font-size:14px;font-family:inherit}
-        .xp-zodiac{display:grid;grid-template-columns:repeat(12,1fr);gap:8px;margin-top:12px}
-        @media(max-width:620px){.xp-zodiac{grid-template-columns:repeat(6,1fr)}}
-        .xp-z{background:#0d1730;border:1px solid #24345c;border-radius:9px;padding:8px 4px;text-align:center;cursor:pointer;font-size:11.5px;color:#93a3c4}
-        .xp-z.on{border-color:#3b82f6;background:rgba(59,130,246,.16);color:#dbeafe}
-        .xp-z b{display:block;font-size:17px;margin-bottom:2px;color:#c7d8ff}
-        .xp-btn{width:100%;margin-top:16px;padding:12px 20px;border:0;border-radius:9px;background:linear-gradient(92deg,#2563eb,#3b82f6,#22d3ee);color:#fff;font-weight:700;font-size:15px;cursor:pointer;transition:transform .15s}
+        .xp-date{color:#7dd3fc;font-size:13px;margin-bottom:18px;font-variant-numeric:tabular-nums}
+        .xp-zodiac{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+        @media(max-width:620px){.xp-zodiac{grid-template-columns:repeat(4,1fr)}}
+        .xp-z{background:#0d1730;border:1px solid #24345c;border-radius:11px;padding:11px 4px;text-align:center;cursor:pointer;font-size:12px;color:#93a3c4;transition:.15s}
+        .xp-z:hover{border-color:#60a5fa}
+        .xp-z.on{border-color:#22d3ee;background:rgba(34,211,238,.13);color:#dbeafe;transform:translateY(-1px)}
+        .xp-z b{display:block;font-size:24px;margin-bottom:3px;color:#c7d8ff}
+        .xp-topics{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+        .xp-t{padding:9px 16px;border-radius:14px;border:1px solid #2f4170;background:#0d1730;color:#93a3c4;font-size:13.5px;cursor:pointer;transition:.15s}
+        .xp-t:hover{border-color:#60a5fa;color:#bfdbfe}
+        .xp-t.on{border-color:#22d3ee;background:rgba(34,211,238,.12);color:#a5f3fc;font-weight:600;transform:translateY(-1px)}
+        .xp-row{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:14px}
+        .xp-seg{display:inline-flex;border:1px solid #2f4170;border-radius:9px;overflow:hidden}
+        .xp-seg button{padding:8px 15px;border:0;background:transparent;color:#93a3c4;font-size:13px;cursor:pointer;font-family:inherit}
+        .xp-seg button.on{background:rgba(59,130,246,.2);color:#dbeafe;font-weight:600}
+        .xp-nick{display:flex;align-items:center;gap:8px;font-size:13px;color:#93a3c4}
+        .xp-nick input{width:130px;padding:8px 10px;border:1px solid #2f4170;background:#0d1730;color:#e8eefc;border-radius:8px;font-size:13px;font-family:inherit}
+        .xp-btn{width:100%;margin-top:16px;padding:12px 20px;border:0;border-radius:9px;background:linear-gradient(92deg,#2563eb,#3b82f6,#22d3ee);color:#fff;font-weight:700;font-size:15px;cursor:pointer;transition:transform .15s;font-family:inherit}
         .xp-btn:hover{transform:translateY(-1px)}
         .xp-btn:disabled{opacity:.6;cursor:wait}
-        .xp-deep{background:linear-gradient(92deg,#6366f1,#a855f7);margin-top:12px}
+        .xp-deep{background:linear-gradient(92deg,#6366f1,#a855f7)}
         .xp-err{margin-top:14px;border:1px solid #7f2b2b;background:rgba(248,113,113,.08);color:#fca5a5;border-radius:9px;padding:11px 13px;font-size:13px}
         .xp-out{border:1px solid #26355c;border-radius:12px;padding:18px;background:#0d1730;margin-top:18px;white-space:pre-wrap;line-height:1.9;font-size:14.5px;color:#dbe6ff;text-align:left}
-        .xp-topics{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-        .xp-t{padding:9px 16px;border-radius:14px;border:1px solid #2f4170;background:#0d1730;color:#93a3c4;font-size:13.5px;cursor:pointer;transition:.15s}
-        .xp-t.on{transform:translateY(-1px)}
-        .xp-t:hover{border-color:#60a5fa;color:#bfdbfe}
-        .xp-t.on{border-color:#22d3ee;background:rgba(34,211,238,.12);color:#a5f3fc;font-weight:600}
-        .xp-acts{margin-top:16px;border:1px dashed #33507f;border-radius:12px;padding:14px;background:rgba(34,211,238,.04)}
-        .xp-acts-h{display:flex;justify-content:space-between;align-items:center;font-size:14px;margin-bottom:8px}
-        .xp-acts-h span{color:#7dd3fc;font-variant-numeric:tabular-nums}
-        .xp-acts-bar{height:5px;border-radius:5px;background:#1a2a4d;overflow:hidden;margin-bottom:10px}
-        .xp-acts-bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#22d3ee,#4ade80);transition:width .35s ease}
-        .xp-act{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;margin-bottom:7px;
-          border:1px solid #26355c;background:#0d1730;border-radius:10px;color:#dbe6ff;font-size:13.5px;cursor:pointer;transition:.15s}
-        .xp-act:hover{border-color:#60a5fa}
-        .xp-act .box{width:20px;height:20px;flex:none;border:1.5px solid #3b5a8f;border-radius:6px;display:grid;place-items:center;font-size:12px;color:#052e16}
-        .xp-act.done{opacity:.75;border-color:rgba(74,222,128,.5)}
-        .xp-act.done .box{background:#4ade80;border-color:#4ade80}
-        .xp-act.done{text-decoration:line-through;text-decoration-color:rgba(219,230,255,.4)}
-        .xp-acts-tip{margin:6px 0 0;font-size:12px;color:#93a3c4}
-        .xp-head{display:flex;justify-content:space-between;margin-bottom:10px;font-weight:700}
+        .xp-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;font-weight:700}
+        .xp-head .xp-when{color:#7dd3fc;font-weight:400;font-size:13px;font-variant-numeric:tabular-nums}
         .xp-badge{font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid #2563eb;color:#7dd3fc;background:rgba(37,99,235,.12);font-weight:400}
+        /* 破局报告 teaser：先看见锁住的是什么，再谈解锁 */
+        .xp-teaser{margin-top:16px;border:1px solid #3d2f6e;border-radius:12px;padding:15px;background:linear-gradient(135deg,rgba(99,102,241,.09),rgba(168,85,247,.07))}
+        .xp-teaser h3{margin:0 0 8px;font-size:14.5px;color:#c4b5fd}
+        .xp-teaser ul{margin:0 0 4px;padding-left:18px;color:#b7a8ee;font-size:13.5px;line-height:2}
+        .xp-teaser-tip{margin:8px 0 0;font-size:12px;color:#93a3c4;text-align:center}
+        /* 3D 翻牌行动卡 */
+        .xp-cardwrap{perspective:900px;height:88px;margin-bottom:9px}
+        .xp-cardin{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.2,.7,.3,1.15);cursor:pointer}
+        .xp-cardwrap.flipped .xp-cardin{transform:rotateY(180deg)}
+        .xp-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;align-items:center;gap:11px;padding:12px 15px;
+          border-radius:11px;border:1px solid #26355c;background:#0d1730;color:#dbe6ff;font-size:13.5px;text-align:left;width:100%}
+        .xp-face.back{justify-content:center;color:#7dd3fc;background:linear-gradient(135deg,#13224a,#0d1730);letter-spacing:1px}
+        .xp-face.front{transform:rotateY(180deg);font-family:inherit}
+        .xp-cardwrap.done .xp-face.front{opacity:.75;border-color:rgba(74,222,128,.5)}
+        .xp-cardwrap.done .xp-face.front .txt{text-decoration:line-through;text-decoration-color:rgba(219,230,255,.4)}
+        .xp-box{width:21px;height:21px;flex:none;border:1.5px solid #3b5a8f;border-radius:6px;display:grid;place-items:center;font-size:12px;color:#052e16}
+        .xp-cardwrap.done .xp-box{background:#4ade80;border-color:#4ade80}
+        .xp-acts{margin-top:16px;border:1px dashed #33507f;border-radius:12px;padding:14px;background:rgba(34,211,238,.04)}
+        .xp-acts-h{display:flex;justify-content:space-between;align-items:center;font-size:14px;margin-bottom:10px}
+        .xp-acts-h span{color:#7dd3fc;font-variant-numeric:tabular-nums}
+        .xp-acts-bar{height:5px;border-radius:5px;background:#1a2a4d;overflow:hidden;margin-bottom:12px}
+        .xp-acts-bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#22d3ee,#4ade80);transition:width .35s ease}
+        .xp-acts-tip{margin:8px 0 0;font-size:12px;color:#93a3c4;text-align:center}
+        .xp-share{margin-top:12px;padding:10px 18px;border:1px solid #f3d98b55;border-radius:9px;background:rgba(243,217,139,.08);color:#f3d98b;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
+        .xp-share:hover{background:rgba(243,217,139,.15)}
       `}</style>
 
       <section className="hero xp-hero">
         <div className="eyebrow">AI 占星 · 心理版 · 免费</div>
         <h1>AI 星盘相位 · 深度运势</h1>
         <p className="sub">选一个议题，30 秒拿到今天的相位速览。</p>
+        <p className="xp-date">{dateLabel()} · 每天一张新星签</p>
       </section>
 
-      <section className="panel" aria-label="选择星座与周期">
-        <div className="xp-grid">
-          {/* 自由文本（姓名/昵称）：整棵子树对会话回放阻断，见 lib/posthog-replay.mjs 的敏感选择器 */}
-          <div className="ph-no-capture" data-ph-no-capture>
-            <label htmlFor="nick">我的姓名/昵称</label>
-            <input id="nick" value={nick} maxLength={20} placeholder="输入姓名，解析更准"
-              onChange={(e) => setNick(e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="signSel">星座</label>
-            <select id="signSel" value={sign} onChange={(e) => setSign(e.target.value)}>
-              {SIGNS.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="periodSel">周期</label>
-            <select id="periodSel" value={period} onChange={(e) => setPeriod(e.target.value as 'daily' | 'weekly')}>
-              <option value="daily">今日简报</option>
-              <option value="weekly">本周趋势</option>
-            </select>
-          </div>
+      <section className="panel" aria-label="选择星座与议题">
+        <div className="xp-zodiac" role="listbox" aria-label="十二星座">
+          {SIGNS.map((s) => (
+            <button key={s.n} type="button" role="option" aria-selected={sign === s.n}
+              className={'xp-z' + (sign === s.n ? ' on' : '')}
+              onClick={() => setSign(s.n)}>
+              <b>{s.g}</b>{s.n}
+            </button>
+          ))}
         </div>
         <div className="xp-topics" aria-label="今日议题">
           {TOPICS.map((t) => (
@@ -311,14 +427,17 @@ export default function FortuneApp() {
               onClick={() => setTopic(t.k)}>{t.e} {t.k}</button>
           ))}
         </div>
-        <div className="xp-zodiac" role="listbox" aria-label="十二星座">
-          {SIGNS.map((s) => (
-            <button key={s} type="button" role="option" aria-selected={sign === s}
-              className={'xp-z' + (sign === s ? ' on' : '')}
-              onClick={() => setSign(s)}>
-              <b>{s[0]}</b>{s[1]}
-            </button>
-          ))}
+        <div className="xp-row">
+          <div className="xp-seg" role="group" aria-label="周期">
+            <button type="button" className={period === 'daily' ? 'on' : ''} onClick={() => setPeriod('daily')}>今日简报</button>
+            <button type="button" className={period === 'weekly' ? 'on' : ''} onClick={() => setPeriod('weekly')}>本周趋势</button>
+          </div>
+          {/* 称呼仅用于星签署名（可选）：低承诺、不挡主流程；整棵子树对会话回放阻断，见 lib/posthog-replay.mjs 的敏感选择器 */}
+          <div className="xp-nick ph-no-capture" data-ph-no-capture>
+            <label htmlFor="nick">署名</label>
+            <input id="nick" value={nick} maxLength={12} placeholder="可选，印在星签上"
+              onChange={(e) => setNick(e.target.value)} />
+          </div>
         </div>
         <button className="xp-btn" onClick={generate} disabled={loading}>
           {loading ? '星盘解析中…' : (topic === '综合' ? '✦ 解析我的相位' : '✦ 围绕「' + topic + '」解析我的相位')}
@@ -330,40 +449,64 @@ export default function FortuneApp() {
         {result && (
           <section className="panel xp-out" ref={outRef}>
             <div className="xp-head">
-              <span>{sign} · {unlocked ? '心理相位破局报告' : (period === 'weekly' ? '本周趋势' : '今日简报')}</span>
+              <span>{signGlyph} {sign} · {unlocked ? '心理相位破局报告' : (period === 'weekly' ? '本周趋势' : '今日简报')}
+                <span className="xp-when">　{dateLabel()}{streak >= 2 ? ' · 🔥 连续 ' + streak + ' 天' : ''}</span>
+              </span>
               <span className="xp-badge">AI 生成</span>
             </div>
             {result}
             {actions.length > 0 && (
               <div className="xp-acts">
                 <div className="xp-acts-h">
-                  <b>🧩 破局行动卡 · 今天做这三件</b>
+                  <b>🧩 破局行动卡 · 翻开今天的三件事</b>
                   <span>{actions.filter((a) => a.done).length}/3</span>
                 </div>
                 <div className="xp-acts-bar"><i style={{ width: (actions.filter((a) => a.done).length / 3) * 100 + '%' }} /></div>
                 {actions.map((a, i) => (
-                  <button key={a.text} type="button" className={'xp-act' + (a.done ? ' done' : '')}
-                    onClick={() => toggleAction(i)}>
-                    <span className="box">{a.done ? '✓' : ''}</span>{a.text}
-                  </button>
+                  <div key={a.text} className={'xp-cardwrap' + (a.flipped ? ' flipped' : '') + (a.done ? ' done' : '')}>
+                    <div className="xp-cardin" role="button" tabIndex={0}
+                      aria-label={a.flipped ? a.text : '第' + (i + 1) + '件事，点击翻开'}
+                      onClick={() => flipCard(i)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(i); } }}>
+                      <div className="xp-face back">✦ 第 {i + 1} 件 · 轻触翻开</div>
+                      <button type="button" className="xp-face front" tabIndex={-1}>
+                        <span className="xp-box">{a.done ? '✓' : ''}</span>
+                        <span className="txt">{a.text}</span>
+                      </button>
+                    </div>
+                  </div>
                 ))}
                 <p className="xp-acts-tip">
-                  {actions.every((a) => a.done)
-                    ? '🎉 三件全做完——今天的你已经赢过昨天的自己。明天来看新的行动卡。'
-                    : '全部勾完，点亮今日成就。'}
+                  {allDone
+                    ? '🎉 三件全做完——今天的你已经赢过昨天的自己。明天来抽新的行动卡。'
+                    : '翻开 → 做到 → 打勾。三件全做完，生成你的今日星签。'}
                 </p>
+                {allDone && (
+                  <div style={{ textAlign: 'center' }}>
+                    <button type="button" className="xp-share" onClick={shareCard}>🖼 生成今日星签 · 分享给朋友</button>
+                  </div>
+                )}
               </div>
             )}
             {!unlocked && (
-              <button className="xp-btn xp-deep" onClick={onUnlock} disabled={deepBusy}>
-                {deepBusy ? '正在加载广告...' : '✨ 解锁【心理相位破局报告】（观看视频解锁）'}
-              </button>
+              <div className="xp-teaser">
+                <h3>🔒 心理相位破局报告</h3>
+                <ul>
+                  <li>你的潜意识正在重复什么模式</li>
+                  <li>这段时间的关系动力学与雷区</li>
+                  <li>一条今天就能执行的破局路径</li>
+                </ul>
+                <button className="xp-btn xp-deep" onClick={onUnlock} disabled={deepBusy}>
+                  {deepBusy ? '正在准备…' : '▶ 看一段视频，免费解锁完整报告'}
+                </button>
+                <p className="xp-teaser-tip">全程约 30 秒 · 看完即解锁</p>
+              </div>
             )}
           </section>
         )}
         {!result && !loading && !err && (
           <section className="panel empty">
-            <p>选议题 → 生成 → 翻牌三件今天能做的事。</p>
+            <p>点星座 → 选议题 → 生成今天的星签。</p>
           </section>
         )}
       </div>
@@ -371,8 +514,8 @@ export default function FortuneApp() {
       <section className="panel about">
         <h2 className="section-title">为什么免费？</h2>
         <p className="muted">
-          概览免费、无需注册；深度破局报告看一段视频即可解锁，看完由服务端裁决发奖。
-          觉得准不准都欢迎截图分享，但别用它替你做重大决定——运势是视角，不是答案。
+          概览免费、无需注册；深度破局报告看一段视频即可解锁。做完行动卡还能生成专属星签图，分享给朋友。
+          但别用它替你做重大决定——运势是视角，不是答案。
         </p>
       </section>
 

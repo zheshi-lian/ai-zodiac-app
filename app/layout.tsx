@@ -51,7 +51,7 @@ const jsonLd = {
   applicationCategory: 'LifestyleApplication',
   operatingSystem: 'Web',
   inLanguage: 'zh-CN',
-  description: '选择星座生成今日、本周、本月运势，包含事业、感情、财运与健康建议。',
+  description: '选择星座与议题，30 秒生成今日相位速览与翻牌破局行动卡，看视频解锁心理相位破局报告。',
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'CNY' },
   publisher: { '@type': 'Organization', name: 'AppLink', url: 'https://dellai.xyz' },
 };
