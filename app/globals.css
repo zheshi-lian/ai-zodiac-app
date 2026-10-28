@@ -2,10 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 深空夜幕底（2026-10-28 配色修复）：此前残留 Tailwind 浅色 body（#fafafa），
+   深色玻璃面板浮在浅底上导致对比度全坏——面板块、muted 文本全部看不清。
+   统一到 themeColor #0f0c29 的夜间星空系，面板的半透明白才有正确的衬底。 */
 body {
-  background: #fafafa;
-  color: #111;
   min-height: 100vh;
+  background:
+    radial-gradient(1100px 480px at 82% -8%, rgba(124, 92, 255, 0.18), transparent 60%),
+    radial-gradient(900px 420px at 8% -4%, rgba(47, 139, 255, 0.12), transparent 55%),
+    linear-gradient(180deg, #0f0c29 0%, #141034 52%, #0d0a20 100%);
+  background-attachment: fixed;
+  background-color: #0f0c29;
+  color: #e8e6ff;
+  color-scheme: dark;
 }
 
 .glass-card {
