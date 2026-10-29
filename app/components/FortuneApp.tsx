@@ -46,6 +46,15 @@ export default function FortuneApp() {
   const nativeSlotRef = useRef<HTMLDivElement>(null);
   const outRef = useRef<HTMLDivElement>(null);
   const unlockedViaRef = useRef<'rewarded' | 'fallback'>('rewarded');
+  // AI 诊断感加载文案：解析阶段轮播（心理版专属语感，与神秘版的吉凶口吻区隔开）
+  const [diagStep, setDiagStep] = useState(0);
+  const DIAG_STEPS = ['正在对齐行星相位…', '正在读取潜意识信号…', '正在翻译情绪机制…', '正在生成破局路径…'];
+  useEffect(() => {
+    if (!loading && !deepBusy) return;
+    const t = setInterval(() => setDiagStep((n) => n + 1), 2200);
+    return () => clearInterval(t);
+  }, [loading, deepBusy]);
+  const diagText = DIAG_STEPS[diagStep % DIAG_STEPS.length];
 
   // ── 破局行动卡：从议题行动池按「日期×星座×议题」确定性抽 3 条（可玩性 + 明日回访钩子）──
   // 勾满 3 件 → 庆祝态 + 带任务深度信号（ai_signals）刷新原生位，让平台在"完成度最高"
@@ -402,6 +411,14 @@ export default function FortuneApp() {
         .xp-acts-tip{margin:8px 0 0;font-size:12px;color:#93a3c4;text-align:center}
         .xp-share{margin-top:12px;padding:10px 18px;border:1px solid #f3d98b55;border-radius:9px;background:rgba(243,217,139,.08);color:#f3d98b;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
         .xp-share:hover{background:rgba(243,217,139,.15)}
+        /* AI 诊断感：解析时的扫描线 + 阶段文案轮播（趣味性，2026-10-30） */
+        .xp-loading{position:relative;overflow:hidden;min-height:120px}
+        .xp-loading::after{content:'';position:absolute;left:0;right:0;top:0;height:2px;
+          background:linear-gradient(90deg,transparent,#22d3ee,transparent);
+          animation:xpscan 1.6s ease-in-out infinite}
+        @keyframes xpscan{0%{top:0;opacity:0}12%{opacity:1}50%{top:calc(100% - 2px)}88%{opacity:1}100%{top:0;opacity:0}}
+        .xp-diag{color:#7dd3fc;font-size:13px;letter-spacing:.5px;font-variant-numeric:tabular-nums;animation:xpdiag 2.4s ease infinite}
+        @keyframes xpdiag{0%,100%{opacity:.55}50%{opacity:1}}
       `}</style>
 
       <section className="hero xp-hero">
@@ -440,12 +457,17 @@ export default function FortuneApp() {
           </div>
         </div>
         <button className="xp-btn" onClick={generate} disabled={loading}>
-          {loading ? '星盘解析中…' : (topic === '综合' ? '✦ 解析我的相位' : '✦ 围绕「' + topic + '」解析我的相位')}
+          {loading ? diagText : (topic === '综合' ? '✦ 解析我的相位' : '✦ 围绕「' + topic + '」解析我的相位')}
         </button>
       </section>
 
       <div aria-live="polite">
         {err && <div className="panel xp-err" role="alert">{err}</div>}
+        {loading && !result && (
+          <section className="panel xp-out xp-loading">
+            <div className="xp-diag">⚕ {diagText}</div>
+          </section>
+        )}
         {result && (
           <section className="panel xp-out" ref={outRef}>
             <div className="xp-head">
@@ -497,7 +519,7 @@ export default function FortuneApp() {
                   <li>一条今天就能执行的破局路径</li>
                 </ul>
                 <button className="xp-btn xp-deep" onClick={onUnlock} disabled={deepBusy}>
-                  {deepBusy ? '正在准备…' : '▶ 看一段视频，免费解锁完整报告'}
+                  {deepBusy ? diagText : '▶ 看一段视频，免费解锁完整报告'}
                 </button>
                 <p className="xp-teaser-tip">全程约 30 秒 · 看完即解锁</p>
               </div>
